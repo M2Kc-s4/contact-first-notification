@@ -16,25 +16,38 @@ const pool = new Pool({
 const app = new Elysia()
 .use(swagger({'provider': 'swagger-ui'}))
 
-app.post('/api/tasks', 
+.post('/api/tasks', 
     async ({
         body
     }) => {
-        const task = new Task(
-            body.title, body.description, body.status
-        )
-
-        await saveTask(pool, task)
-
-        return new Response(JSON.stringify(task), {status: 201})
+        try {
+            const task = new Task(
+                body.title, body.description, body.status
+            )
+            
+            await saveTask(pool, task)
+            
+            await pool.notify('events', JSON.stringify(task))
+            
+            return new Response(JSON.stringify(task), {status: 201})
+        } catch (err) {
+            console.error(err)
+            return new Response("Internal Server Error", {status: 500})
+        }
     },
     {
         body: t.Object({
             title: t.String(),
             description: t.String(),
-            status: t.Union([t.Literal('new'), t.Literal('progress'), t.Literal('done')] as const)
+            status: t.Union([
+                t.Literal('new'), 
+                t.Literal('progress'), 
+                t.Literal('done')
+            ] as const)
         })
     }
 )
 
 app.listen(8001)
+
+console.log("Task started")
